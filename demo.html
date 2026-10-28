@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Channelplay LMS (Fog Bubble gate demo)</title>
+<link rel="icon" href="data:,">
+<script>
+/* Runs before anything is drawn, so the LMS never flashes before the gate.
+   It decides one thing: show the gate, or go straight in.
+   How often the gate shows:  'login' = every time this page loads
+                              'day'   = once a day (the default for this demo)
+                              'ever'  = once, the first time only
+   For testing, add ?gate=login, ?gate=day or ?gate=ever to this page's address. */
+(function () {
+  var KEY = 'fog-bubble-gate';
+  var mode = 'day';
+  var m = /[?&]gate=(login|day|ever)(&|$)/.exec(location.search);
+  if (m) mode = m[1];
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function today() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function read() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+
+  var saved = read();
+  var passed = mode !== 'login' && !!saved && (mode === 'ever' || saved.date === today());
+  document.documentElement.className += passed ? ' fb-passed' : ' fb-gated';
+  window.FB_GATE = { key: KEY, mode: mode, passed: passed, saved: saved, today: today };
+})();
+</script>
+<style>
+  /* ---------- the plain LMS page (a stand-in for your own) ---------- */
+  :root{
+    --ink:#1D2433; --ink2:#5E6678; --line:#E3E6EB; --bg:#F5F6F8; --card:#fff; --ok:#1E7F52; --accent:#2F54D6;
+    --ui:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--ui)}
+  .top{height:56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:28px;padding:0 32px}
+  .label{font-size:13px;font-weight:700;letter-spacing:.01em;color:var(--ink)}
+  .nav{display:flex;gap:22px;font-size:14px;color:var(--ink2)}
+  .nav span[aria-current]{color:var(--ink);font-weight:600}
+  .avatar{margin-left:auto;width:32px;height:32px;border-radius:50%;background:#E4E7EE;display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--ink2)}
+  main{max-width:880px;margin:0 auto;padding:36px 32px 48px}
+  h1{margin:0 0 4px;font-size:28px;line-height:1.2;font-weight:700}
+  h1:focus{outline:none}  /* focus lands here after the gate, for screen readers; it is not a control, so no ring */
+  .sub{margin:0;color:var(--ink2)}
+  .status{display:inline-flex;align-items:center;gap:8px;margin:16px 0 0;padding:6px 12px 6px 8px;border-radius:999px;background:#E6F4EC;color:#14583A;font-size:13px;font-weight:600}
+  .status[hidden]{display:none}
+  .status svg{flex:none}
+  h2{margin:32px 0 12px;font-size:17px;font-weight:700}
+  .course{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .course .row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .course .tx{flex:1;min-width:200px}
+  .course b{display:block;font-size:17px}
+  .course .meta{font-size:13px;color:var(--ink2)}
+  .progress{display:flex;align-items:center;gap:12px;margin:14px 0 16px;font-size:13px;color:var(--ink2)}
+  .progress .bar{flex:1;max-width:320px;height:8px;border-radius:8px;background:#E4E7EE;overflow:hidden}
+  .progress .bar i{display:block;height:100%;width:50%;background:var(--ok);border-radius:8px}
+  .items{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+  .item{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .item .ic{flex:none;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:#F0F2F5}
+  .item .tx{flex:1;min-width:0}
+  .item b{display:block;font-weight:600;font-size:15px}
+  .item .meta{display:block;font-size:13px;color:var(--ink2)}
+  .item .st{flex:none;font-size:13px;color:var(--ink2)}
+  .item.done .st{color:var(--ok);font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .tile .thumb{height:96px;border-radius:10px;background:linear-gradient(135deg,#E9ECF2,#DDE2EA);margin-bottom:12px}
+  .tile b{display:block;font-size:15px}
+  .tile .meta{font-size:13px;color:var(--ink2)}
+  .btn{font:600 14px/1 var(--ui);min-height:40px;padding:0 18px;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+  .btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+  footer{max-width:880px;margin:0 auto;padding:0 32px 72px;font-size:12px;color:var(--ink2)}
+
+  /* demo-only reset, bottom-right corner, shown only once the LMS is open */
+  .fb-reset{position:fixed;right:12px;bottom:12px;z-index:10;display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;
+    border:1px dashed #9AA3B5;border-radius:999px;background:rgba(255,255,255,.94);color:var(--ink2);font:600 12px/1 var(--ui);text-decoration:none}
+  .fb-reset em{font-style:normal;font-weight:700;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#8A5A00;background:#FFF1CC;border-radius:4px;padding:3px 5px}
+  .fb-reset:hover{color:var(--ink);border-color:var(--ink2)}
+  .fb-reset:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+  /* ---------- the mandatory gate ---------- */
+  /* While gated: the LMS is blurred, dimmed, not clickable and does not scroll. */
+  html.fb-gated,html.fb-gated body{overflow:hidden;height:100%;overscroll-behavior:none}
+  html.fb-gated body{position:fixed;left:0;right:0;top:0;width:100%}
+  #lms{transition:filter .4s ease}
+  html.fb-gated #lms{filter:blur(6px);pointer-events:none;-webkit-user-select:none;user-select:none}
+  html.fb-gated .fb-reset,html.fb-passed .fb-gate{display:none}
+
+  .fb-gate{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px;
+    background:rgba(16,12,52,.58);transition:opacity .4s ease}
+  .fb-gate.is-leaving{opacity:0;pointer-events:none}
+  .fb-box{display:flex;flex-direction:column;align-items:center;gap:12px;animation:fb-in .3s cubic-bezier(.2,.9,.3,1.1) both}
+  @keyframes fb-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  .fb-head{margin:0;color:#fff;font:700 16px/1.3 var(--ui);text-align:center}
+  .fb-note{margin:0;color:rgba(255,255,255,.78);font:400 13px/1.4 var(--ui);text-align:center}
+  .fb-frame{display:block;width:320px;height:400px;border:0;border-radius:16px;background:#5B4BDB;box-shadow:0 24px 60px rgba(8,5,40,.5)}
+  .fb-frame:focus{outline:none}
+  .fb-edge{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* short windows: drop the two lines of text */
+  @media (max-height:560px){
+    .fb-head,.fb-note{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  }
+  /* phones and very short windows: the game goes full screen */
+  @media (max-width:600px),(max-height:440px){
+    .fb-gate{padding:0;background:#5B4BDB}
+    .fb-box{animation:none}
+    .fb-head,.fb-note{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+    .fb-frame{position:fixed;inset:0;width:100%;height:100%;border-radius:0;box-shadow:none}
+  }
+  @media (max-width:600px){
+    .top{padding:0 16px;gap:16px}
+    .nav{display:none}
+    main{padding:24px 16px 40px}
+    footer{padding:0 16px 72px}
+    h1{font-size:23px}
+    .item .st{display:none}
+    .btn{min-height:44px}
+    .course .tx{flex-basis:100%}
+    .course .btn{width:100%}
+    .fb-reset{min-height:44px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #lms,.fb-gate{transition:none}
+    .fb-box{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= the LMS (your own page) ================= -->
+<div id="lms">
+  <header class="top">
+    <span class="label">Channelplay LMS</span>
+    <nav class="nav" aria-label="Main">
+      <span>Home</span>
+      <span aria-current="page">My learning</span>
+      <span>Calendar</span>
+    </nav>
+    <span class="avatar" aria-hidden="true">RK</span>
+  </header>
+
+  <main>
+    <h1 id="lms-title" tabindex="-1">Welcome back</h1>
+    <p class="sub">Pick up where you left off.</p>
+    <p class="status" id="fb-status" role="status" hidden></p>
+
+    <h2>Continue learning</h2>
+    <section class="course" aria-label="Greeting and ushering shoppers">
+      <div class="row">
+        <div class="tx"><b>Greeting and ushering shoppers</b><span class="meta">Level 1 &middot; 4 items &middot; about 15 minutes</span></div>
+        <button class="btn" type="button">Continue</button>
+      </div>
+      <div class="progress"><div class="bar"><i></i></div><span>2 of 4 done</span></div>
+      <ol class="items">
+        <li class="item done">
+          <span class="ic"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#1E7F52"/><path d="M6 10.4l2.6 2.6L14 7.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="tx"><b>Be present at the entry.</b><span class="meta">Video &middot; 4 min</span></span>
+          <span class="st">Completed</span>
+        </li>
+        <li class="item done">
+          <span class="ic"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#1E7F52"/><path d="M6 10.4l2.6 2.6L14 7.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="tx"><b>Ask. Pause. Listen.</b><span class="meta">Reading &middot; 3 min</span></span>
+          <span class="st">Completed</span>
+        </li>
+        <li class="item">
+          <span class="ic"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="4" width="16" height="12" rx="3" fill="#C4CAD6"/><path d="M8.5 7.5v5l4-2.5z" fill="#fff"/></svg></span>
+          <span class="tx"><b>Listen first. Understand the need.</b><span class="meta">Video &middot; 5 min</span></span>
+          <span class="st">Not started</span>
+        </li>
+        <li class="item">
+          <span class="ic"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="2" width="14" height="16" rx="3" fill="#C4CAD6"/><path d="M6.5 7h7M6.5 10h7M6.5 13h4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+          <span class="tx"><b>Customer first. Product later.</b><span class="meta">Quiz &middot; 3 min</span></span>
+          <span class="st">Not started</span>
+        </li>
+      </ol>
+    </section>
+
+    <h2>Assigned to you</h2>
+    <div class="grid">
+      <div class="tile"><div class="thumb"></div><b>Store opening checklist</b><span class="meta">Reading &middot; 6 min</span></div>
+      <div class="tile"><div class="thumb"></div><b>Handling a busy weekend</b><span class="meta">Video &middot; 8 min</span></div>
+      <div class="tile"><div class="thumb"></div><b>Working as one floor team</b><span class="meta">Video &middot; 7 min</span></div>
+    </div>
+  </main>
+  <footer>Demo page. Not a real LMS. The game is one file, fog-bubble.html, shown in an iframe before the LMS opens.</footer>
+</div>
+
+<!-- demo only: clears today's pass so the gate shows again -->
+<a class="fb-reset" id="fb-reset" href="" title="Demo only. Clears today's game pass in this browser and reloads, so the gate shows again."><em>Demo only</em>Reset demo</a>
+
+<!-- ================= the gate ================= -->
+<!-- No Later, no close X. The only way in is the game's Enter LMS button. -->
+<div class="fb-gate" id="fb-gate" role="dialog" aria-modal="true" aria-labelledby="fb-head" aria-describedby="fb-note">
+  <div class="fb-box">
+    <p class="fb-head" id="fb-head">Before you start: one quick game</p>
+    <span class="fb-edge" tabindex="0" data-edge="start"></span>
+    <iframe class="fb-frame" id="fb-frame" src="fog-bubble.html" title="Fog Bubble game" allow="autoplay"></iframe>
+    <span class="fb-edge" tabindex="0" data-edge="end"></span>
+    <p class="fb-note" id="fb-note">About a minute. Your LMS opens when you finish.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var G = window.FB_GATE;
+  var html = document.documentElement;
+  var lms = document.getElementById('lms');
+  var gate = document.getElementById('fb-gate');
+  var frame = document.getElementById('fb-frame');
+  var status = document.getElementById('fb-status');
+  var title = document.getElementById('lms-title');
+  var result = null;
+
+  function showStatus(r) {
+    var t = 'Floor game done today';
+    if (r && typeof r.score === 'number') {
+      t += ' · ' + r.score + '%';
+      if (typeof r.right === 'number') t += ' · ' + r.right + '/6 read right';
+    }
+    status.innerHTML = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#1E7F52"/><path d="M6 10.4l2.6 2.6L14 7.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    status.appendChild(document.createTextNode(t));
+    status.hidden = false;
+  }
+
+  // demo-only reset: forget today's pass (and the game's own saved flags, so the first-time demo shows again), then reload
+  document.getElementById('fb-reset').addEventListener('click', function () {
+    try {
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var k = localStorage.key(i);
+        if (k && /fog-?bubble/i.test(k)) localStorage.removeItem(k);
+      }
+    } catch (e) {}
+  });
+
+  // ---------- already played today: go straight in ----------
+  if (G.passed) {
+    gate.parentNode.removeChild(gate);          // removing it before it loads means the game never starts
+    showStatus(G.saved);
+    return;
+  }
+
+  // ---------- gated ----------
+  lms.setAttribute('inert', '');
+  lms.setAttribute('aria-hidden', 'true');
+
+  // pass the game's own URL options through (for testing): demo.html?pass=60&demo=always
+  var fwd = [];
+  location.search.replace(/^\?/, '').split('&').forEach(function (p) {
+    if (/^(pass|demo)=/.test(p)) fwd.push(p);
+  });
+  if (fwd.length) frame.src = frame.getAttribute('src').split('?')[0] + '?' + fwd.join('&');
+
+  function focusGame() {
+    try { frame.focus({ preventScroll: true }); } catch (e) { frame.focus(); }
+    try { frame.contentWindow.focus(); } catch (e) {}
+  }
+  focusGame();
+  frame.addEventListener('load', function () { if (gate.parentNode) focusGame(); });
+
+  // keep keyboard focus inside the gate
+  Array.prototype.forEach.call(gate.querySelectorAll('.fb-edge'), function (el) {
+    el.addEventListener('focus', focusGame);
+  });
+  function onFocusIn(e) { if (!gate.contains(e.target)) focusGame(); }
+  document.addEventListener('focusin', onFocusIn);
+
+  // clicks or drags on the dim area do nothing (and do not steal focus from the game)
+  gate.addEventListener('mousedown', function (e) { e.preventDefault(); focusGame(); });
+  gate.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+  gate.addEventListener('wheel', function (e) { e.preventDefault(); }, { passive: false });
+
+  // Esc does nothing while the gate is up
+  function onKey(e) {
+    if (e.key === 'Escape' || e.key === 'Esc') { e.preventDefault(); e.stopPropagation(); }
+  }
+  window.addEventListener('keydown', onKey, true);
+
+  function enterLms() {
+    if (!gate.parentNode || gate.classList.contains('is-leaving')) return;
+    var save = { date: G.today() };
+    if (result) { save.score = result.score; save.right = result.right; save.stars = result.stars; }
+    try { localStorage.setItem(G.key, JSON.stringify(save)); } catch (e) {}
+
+    window.removeEventListener('keydown', onKey, true);
+    document.removeEventListener('focusin', onFocusIn);
+    lms.removeAttribute('inert');
+    lms.removeAttribute('aria-hidden');
+    gate.classList.add('is-leaving');           // the overlay fades out...
+    html.classList.remove('fb-gated');          // ...while the LMS un-blurs and scrolls again
+    showStatus(save);
+    try { title.focus({ preventScroll: true }); } catch (e) { title.focus(); }
+
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    setTimeout(function () {
+      if (gate.parentNode) gate.parentNode.removeChild(gate);   // unloads the game: stops its timers and sound
+    }, reduce ? 0 : 450);
+  }
+
+  function num(v, lo, hi) {
+    v = Number(v);
+    if (!isFinite(v)) return null;
+    return Math.max(lo, Math.min(hi, Math.round(v)));
+  }
+
+  window.addEventListener('message', function (e) {
+    if (!frame.contentWindow || e.source !== frame.contentWindow) return;   // only messages from our game
+    var d = e.data;
+    if (!d || typeof d !== 'object' || d.type !== 'fog-bubble') return;
+    if (d.event === 'complete') {
+      // An LMS would send this to its server here (see README).
+      result = { score: num(d.score, 0, 100), right: num(d.right, 0, 6), stars: num(d.stars, 0, 3) };
+    } else if (d.event === 'enter') {
+      enterLms();
+    }
+    // 'close' is ignored on purpose: the gate has no way out except Enter LMS.
+  });
+})();
+</script>
+</body>
+</html>
